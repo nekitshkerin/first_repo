@@ -23,7 +23,7 @@ class MCP4725:
 
         first_byte = self.wm | self.pds | number >> 8
         second_byte = number & 0xFF
-        self.bus.write_byte_data(0x61, first_byte, second_byte)
+        self.bus.write_byte_data(self.address, first_byte, second_byte)
 
         if self.verbose:
             print(f"Число: {number}, отправленные по I2C данные: [0x{(self.address << 1):02X}, 0x{first_byte:02X}, 0x{second_byte:02X}]\n")
@@ -44,11 +44,12 @@ class MCP4725:
         self.set_number(number)
 
 if __name__ == "__main__":
-    dac = MCP4725(dynamic_range=3.3, address=0x61)
+    dac = MCP4725(dynamic_range=5, address=0x61)
 
     try:
-        voltage = float(input("Введите напряжение от 0 до 3.3 В: "))
-        dac.set_voltage(voltage)
+        while True:
+            voltage = float(input("Введите напряжение от 0 до 3.3 В: "))
+            dac.set_voltage(voltage)
     finally:
         dac.deinit()
 
