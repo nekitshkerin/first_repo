@@ -1,59 +1,38 @@
-"""Вспомогательный модуль из задания 3: ЦАП на ШИМ, GPIO12."""
-
-import math
 import RPi.GPIO as GPIO
-
-
 class PWM_DAC:
-    def __init__(self, gpio_pin, pwm_frequency, dynamic_range, verbose=False):
-        if not math.isfinite(dynamic_range) or dynamic_range <= 0:
-            raise ValueError("Диапазон ЦАП должен быть положительным")
-        if not math.isfinite(pwm_frequency) or pwm_frequency <= 0:
-            raise ValueError("Частота ШИМ должна быть положительной")
+    def __init__(self, gpio_pin, pwm_frequency, dynamic_range, verbose = False):
         self.gpio_pin = gpio_pin
         self.dynamic_range = dynamic_range
         self.verbose = verbose
+        self.pwm_frequency = pwm_frequency
         GPIO.setmode(GPIO.BCM)
-        GPIO.setup(self.gpio_pin, GPIO.OUT, initial=0)
-        self.pwm = None
-        try:
-            self.pwm = GPIO.PWM(self.gpio_pin, pwm_frequency)
-            self.pwm.start(0)  # Начинаем с заполнения 0%, то есть с нуля.
-        except BaseException:
-            self.deinit()
-            raise
-
-    def set_voltage(self, voltage):
-        if not math.isfinite(voltage) or not 0 <= voltage <= self.dynamic_range:
-            raise ValueError("Напряжение выходит за диапазон ЦАП")
-        duty_cycle = voltage / self.dynamic_range * 100
-        self.pwm.ChangeDutyCycle(duty_cycle)
-        if self.verbose:
-            print(f"Задано {voltage:.3f} В; заполнение {duty_cycle:.1f}%")
-
+        GPIO.setup(self.gpio_pin, GPIO.OUT)
+        self.pwm = GPIO.PWM(self.gpio_pin, self.pwm_frequency)
+        self.pwm.start(0)
     def deinit(self):
-        try:
-            if self.pwm is not None:
-                self.pwm.stop()
-        finally:
-            try:
-                GPIO.output(self.gpio_pin, 0)
-            finally:
-                GPIO.cleanup(self.gpio_pin)
-
-
+        self.pwm.stop()
+        GPIO.output(self.gpio_pin, 0)
+        GPIO.cleanup()
+    def set_voltage(self, voltage):
+        if not (0.0 <= voltage <= self.dynamic_range):
+            print (f"Напряжение выходит за динамический диапазон ЦАП (0.00 - {self.dynamic_range:.2f} B)")
+            if self.verbose:
+                print ("Устанавливаем 0.0 В")
+            self.pwm.ChangeDutyCycle(0)
+            return
+        duty = voltage / self.dynamic_range * 100
+        self.pwm.ChangeDutyCycle(duty)
+        if self.verbose:
+            print (f"Установлена скважность: {duty:.2f}%")
 if __name__ == "__main__":
-    dac = None
     try:
-        dac = PWM_DAC(12, 500, 3.3, verbose=True)
+        dac = PWM_DAC(12, 500, 3.290, True)
         while True:
             try:
-                dac.set_voltage(float(input("Напряжение, В: ")))
-            except ValueError as error:
-                print(error)
-    except (KeyboardInterrupt, EOFError):
-        print("\nОстановка")
+                voltage = float(input("Введите напряжение в вольтах: "))
+                
+                dac.set_voltage(voltage)
+            except ValueError:
+                print ("Вы ввели не число. Попробуйте еще раз\n")
     finally:
-        if dac is not None:
-            dac.deinit()
-
+        dac.deinit()
