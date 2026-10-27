@@ -1,35 +1,46 @@
-from r2r_adc import R2R_ADC
-from adc_plot import plot_voltage_vs_time, plot_sampling_period_hist
+"""АЦП последовательного счёта: сбор измерений, график и гистограмма."""
+
+import argparse
+import math
 import time
 
+from r2r_adc import R2R_ADC
+import adc_plot
 
-voltage_values = []
-time_values = []
 
-duration = 3.0
-dynamic_range = 3.3
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--range", dest="dynamic_range", type=float, required=True,
+                        help="Измеренное U_DAC при коде 255, В")
+    parser.add_argument("--duration", type=float, default=3.0,
+                        help="Продолжительность опыта, с")
+    args = parser.parse_args()
+    duration = args.duration
+    if not math.isfinite(duration) or duration <= 0:
+        parser.error("Продолжительность должна быть положительным числом")
 
-adc = None
+    voltage_values = []
+    time_values = []
+    adc = None
+    try:
+        adc = R2R_ADC(args.dynamic_range, compare_time=0.0001)
+        start_time = time.perf_counter()
+        while time.perf_counter() - start_time < duration:
+            voltage = adc.get_sc_voltage()
+            elapsed = time.perf_counter() - start_time
+            voltage_values.append(voltage)
+            time_values.append(elapsed)
+    except KeyboardInterrupt:
+        print("\nОпыт прерван, показываем накопленные данные")
+    finally:
+        if adc is not None:
+            adc.deinit()
 
-try:
-    adc = R2R_ADC(dynamic_range, compare_time=0.0001)
+    # Аппаратура уже освобождена; ожидание закрытия окон не удерживает GPIO/I2C.
+    print(f"Получено отсчётов: {len(voltage_values)}")
+    adc_plot.plot_voltage_vs_time(time_values, voltage_values, args.dynamic_range)
+    adc_plot.plot_sampling_period_hist(time_values)
 
-    start_time = time.time()
 
-    while time.time() - start_time < duration:
-        voltage = adc.get_sc_voltage()
-        current_time = time.time() - start_time
-
-        voltage_values.append(voltage)
-        time_values.append(current_time)
-
-    if len(time_values) > 0:
-        plot_voltage_vs_time(time_values, voltage_values, dynamic_range)
-
-    if len(time_values) > 1:
-        plot_sampling_period_hist(time_values)
-
-finally:
-    if adc is not None:
-        adc.deinit()
-
+if __name__ == "__main__":
+    main()
