@@ -4,7 +4,7 @@ import argparse
 import math
 import time
 
-from smbus2 import SMBus, i2c_msg
+import smbus
 
 
 class MCP3021:
@@ -15,18 +15,18 @@ class MCP3021:
         self.dynamic_range = dynamic_range
         self.verbose = verbose
         self.address = 0x4D
-        self.bus = SMBus(1)
+        self.bus = smbus.SMBus(1)
         self._closed = False
 
     def get_number(self):
-        # У MCP3021 нет регистра с адресом 0: читаем сразу два байта.
-        message = i2c_msg.read(self.address, 2)
-        self.bus.i2c_rdwr(message)
-        upper_data_byte, lower_data_byte = list(message)
+        # read_word_data считает первый принятый байт младшим, поэтому меняем их местами.
+        data = self.bus.read_word_data(self.address, 0)
+        lower_data_byte = data >> 8
+        upper_data_byte = data & 0xFF
         # Первый байт: 0000 D9 D8 D7 D6. Второй: D5 ... D0 X X.
         number = ((upper_data_byte & 0x0F) << 6) | (lower_data_byte >> 2)
         if self.verbose:
-            print(f"Байты: {upper_data_byte:02X} {lower_data_byte:02X}; код: {number}")
+            print(f"Данные: {data}, байты: {upper_data_byte:02X} {lower_data_byte:02X}; код: {number}")
         return number
 
     def get_voltage(self):
